@@ -256,6 +256,15 @@ public:
 
   /// Get or add constant to the program
   HLCBuffer &GetOrCreateCBuffer(HLSLBufferDecl *D);
+
+//TIMHACK
+  void MakeGlobalUsed(llvm::GlobalVariable* gv)
+  {
+    gv->setInitializer(llvm::UndefValue::get(gv->getType()->getElementType()));
+    this->CGM.addUsedGlobal(gv);
+    gv->setInitializer(nullptr);
+  }
+//TIMHACK
 };
 }
 
@@ -1837,6 +1846,9 @@ uint32_t CGMSHLSLRuntime::AddSampler(VarDecl *samplerDecl) {
   hlslRes->SetGlobalSymbol(cast<llvm::GlobalVariable>(val));
   hlslRes->SetGlobalName(samplerDecl->getName());
   QualType VarTy = samplerDecl->getType();
+//TIMHACK
+  MakeGlobalUsed(cast<llvm::GlobalVariable>(val));
+//END TIMHACK
   if (const clang::ArrayType *arrayType =
           CGM.getContext().getAsArrayType(VarTy)) {
     if (arrayType->isConstantArrayType()) {
@@ -1894,6 +1906,10 @@ uint32_t CGMSHLSLRuntime::AddUAVSRV(VarDecl *decl,
       cast<llvm::GlobalVariable>(CGM.GetAddrOfGlobalVar(decl));
 
   QualType VarTy = decl->getType().getCanonicalType();
+
+//TIMHACK
+  MakeGlobalUsed(val);
+//TIMHACK
 
   unique_ptr<HLResource> hlslRes(new HLResource);
   hlslRes->SetLowerBound(UINT_MAX);
@@ -2374,6 +2390,9 @@ void MarkUsedFunctionForConst(Value *V, std::unordered_set<Function*> &usedFunc)
 }
 
 static bool CreateCBufferVariable(HLCBuffer &CB,
+//TIMHACK
+    CGMSHLSLRuntime* codegen,
+//TIMHACK
     llvm::Module &M) {
   bool bUsed = false;
   // Build Struct for CBuffer.
@@ -2386,9 +2405,11 @@ static bool CreateCBufferVariable(HLCBuffer &CB,
     llvm::Type *Ty = GV->getType()->getPointerElementType();
     Elements.emplace_back(Ty);
   }
+/*TIMHACK
   // Don't create CBuffer variable for unused cbuffer.
   if (!bUsed)
     return false;
+TIMHACK*/
 
   bool isCBArray = CB.GetRangeSize() != 1;
   llvm::GlobalVariable *cbGV = nullptr;
@@ -2431,6 +2452,9 @@ static bool CreateCBufferVariable(HLCBuffer &CB,
   }
 
   CB.SetGlobalSymbol(cbGV);
+//TIMHACK
+  codegen->MakeGlobalUsed(cbGV);
+//TIMHACK
 
   llvm::Type *opcodeTy = llvm::Type::getInt32Ty(M.getContext());
   llvm::Type *idxTy = opcodeTy;
@@ -2574,6 +2598,9 @@ static void ConstructCBufferAnnotation(
 }
 
 static void ConstructCBuffer(
+//TIMHACK
+    CGMSHLSLRuntime*    codegen,
+//TIMHACK
     HLModule *pHLModule,
     llvm::Type *CBufferType,
     std::unordered_map<Constant *, DxilFieldAnnotation> &AnnotationMap) {
@@ -2586,8 +2613,11 @@ static void ConstructCBuffer(
           *pHLModule->GetModule(), CBufferType, true,
           llvm::GlobalValue::ExternalLinkage, nullptr, CB.GetGlobalName());
       CB.SetGlobalSymbol(pGV);
+//TIMHACK
+      codegen->MakeGlobalUsed(pGV);
+//TIMHACK
     } else {
-      bool bCreated = CreateCBufferVariable(CB, *pHLModule->GetModule());
+      bool bCreated = CreateCBufferVariable(CB, /*TIMHACK*/codegen,/*TIMHACK*/ *pHLModule->GetModule());
       if (bCreated)
         ConstructCBufferAnnotation(CB, dxilTypeSys, AnnotationMap);
       else {
@@ -2596,6 +2626,9 @@ static void ConstructCBuffer(
             *pHLModule->GetModule(), CBufferType, true,
             llvm::GlobalValue::ExternalLinkage, nullptr, CB.GetGlobalName());
         CB.SetGlobalSymbol(pGV);
+//TIMHACK
+        codegen->MakeGlobalUsed(pGV);
+//TIMHACK
       }
     }
     // Clear the constants which useless now.
@@ -3615,7 +3648,7 @@ void CGMSHLSLRuntime::FinishCodeGen() {
   // TODO: create temp variable for constant which has store use.
 
   // Create Global variable and type annotation for each CBuffer.
-  ConstructCBuffer(m_pHLModule, CBufferType, m_ConstVarAnnotationMap);
+  ConstructCBuffer(/*TIMHACK*/ this , /*TIMHACK*/m_pHLModule, CBufferType, m_ConstVarAnnotationMap);
 
   // add global call to entry func
   auto AddGlobalCall = [&](StringRef globalName, Instruction *InsertPt) {

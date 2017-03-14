@@ -1941,6 +1941,10 @@ void DxilGenerationPass::TranslateDxilResourceUses(DxilResourceBase &res, std::u
       DXASSERT(handleMapOnFunction.count(userF), "must exist");
       Value *handle = handleMapOnFunction[userF];
       handleMap[ldInst] = handle;
+//TIMHACK
+    } else if(ConstantExpr *constantExpr = dyn_cast<ConstantExpr>(user)) {
+        // ignore: there is nothing to do
+//TIMHACK
     } else {
       DXASSERT(dyn_cast<GEPOperator>(user) != nullptr,
                "else AddOpcodeParamForIntrinsic in CodeGen did not patch uses "
@@ -2052,6 +2056,12 @@ void DxilGenerationPass::GenerateDxilCBufferHandles(std::unordered_map<Instructi
     if (CB.GetRangeSize() == 1) {
       args[DXIL::OperandIndex::kCreateHandleResIndexOpIdx] = resLowerBound;
       for (auto U : GV->users()) {
+        //TIMHACK
+        if( ConstantExpr* constantExpr = dyn_cast<ConstantExpr>(U) ) {
+          // ignore used in `llvm.used`
+          continue;
+        }
+        //TIMHACK
         // Must CBufferSubscript.
         CallInst *CI = cast<CallInst>((U));
         IRBuilder<> Builder(CI);

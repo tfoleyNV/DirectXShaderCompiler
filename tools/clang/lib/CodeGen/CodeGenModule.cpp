@@ -387,6 +387,15 @@ void CodeGenModule::Release() {
   EmitDeferredUnusedCoverageMappings();
   if (CoverageMapping)
     CoverageMapping->emit();
+
+//TIMHACK
+  // HLSL Change Starts
+  if (Context.getLangOpts().HLSL) {
+    FinishCodeGen();
+  }
+  // HLSL Change Ends
+//TIMHACK
+
   emitLLVMUsed();
 
   if (CodeGenOpts.Autolink &&
@@ -422,11 +431,13 @@ void CodeGenModule::Release() {
     getModule().addModuleFlag(llvm::Module::Error, "min_enum_size", EnumWidth);
   }
 
+/*TIMHACK
   // HLSL Change Starts
   if (Context.getLangOpts().HLSL) {
     FinishCodeGen();
   }
   // HLSL Change Ends
+TIMHACK*/
 
   if (uint32_t PLevel = Context.getLangOpts().PICLevel) {
     llvm::PICLevel::Level PL = llvm::PICLevel::Default;

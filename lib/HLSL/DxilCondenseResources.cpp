@@ -69,7 +69,9 @@ public:
     PatchTBuffers(DM);
 
     // Remove unused resource.
+/*TIMHACK
     DM.RemoveUnusedResources();
+TIMHACK*/
 
     // Make sure all resource types are dense; build a map of rewrites.
     if (BuildRewriteMap(DM)) {
